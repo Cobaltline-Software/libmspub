@@ -73,8 +73,10 @@ struct CustomShape
   const Vertex *mp_gluePoints;
   unsigned m_numGluePoints;
   unsigned char m_adjustShiftMask;
+  int m_coordLeft; // where the geometry space starts (geoLeft / geoTop); 0 for built-in shapes
+  int m_coordTop;
 
-  CustomShape(const Vertex *p_vertices, unsigned numVertices, const unsigned short *p_elements, unsigned numElements, const Calculation *p_calculations, unsigned numCalculations, const int *p_defaultAdjustValues, unsigned numDefaultAdjustValues, const TextRectangle *p_textRectangles, unsigned numTextRectangles, unsigned coordWidth, unsigned coordHeight, const Vertex *p_gluePoints, unsigned numGluePoints, unsigned char adjustShiftMask = 0) :
+  CustomShape(const Vertex *p_vertices, unsigned numVertices, const unsigned short *p_elements, unsigned numElements, const Calculation *p_calculations, unsigned numCalculations, const int *p_defaultAdjustValues, unsigned numDefaultAdjustValues, const TextRectangle *p_textRectangles, unsigned numTextRectangles, unsigned coordWidth, unsigned coordHeight, const Vertex *p_gluePoints, unsigned numGluePoints, unsigned char adjustShiftMask = 0, int coordLeft = 0, int coordTop = 0) :
     mp_vertices(p_vertices), m_numVertices(numVertices),
     mp_elements(p_elements), m_numElements(numElements),
     mp_calculations(p_calculations), m_numCalculations(numCalculations),
@@ -82,7 +84,8 @@ struct CustomShape
     mp_textRectangles(p_textRectangles), m_numTextRectangles(numTextRectangles),
     m_coordWidth(coordWidth), m_coordHeight(coordHeight),
     mp_gluePoints(p_gluePoints), m_numGluePoints(numGluePoints),
-    m_adjustShiftMask(adjustShiftMask)
+    m_adjustShiftMask(adjustShiftMask),
+    m_coordLeft(coordLeft), m_coordTop(coordTop)
   {
   }
 };
@@ -98,13 +101,15 @@ struct DynamicCustomShape
   unsigned m_coordWidth;
   unsigned m_coordHeight;
   unsigned char m_adjustShiftMask;
+  int m_coordLeft;
+  int m_coordTop;
 
-  DynamicCustomShape(unsigned coordWidth, unsigned coordHeight)
+  DynamicCustomShape(unsigned coordWidth, unsigned coordHeight, int coordLeft = 0, int coordTop = 0)
     : m_vertices(), m_elements(),
       m_calculations(), m_defaultAdjustValues(),
       m_textRectangles(), m_gluePoints(),
       m_coordWidth(coordWidth), m_coordHeight(coordHeight),
-      m_adjustShiftMask(0)
+      m_adjustShiftMask(0), m_coordLeft(coordLeft), m_coordTop(coordTop)
   {
   }
 };

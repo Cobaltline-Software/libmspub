@@ -44,6 +44,7 @@ struct ShapeInfo
   std::vector<Line> m_lines;
   boost::optional<unsigned> m_pageSeqNum;
   boost::optional<unsigned> m_textId;
+  boost::optional<unsigned> m_textChainIndex; // position in a linked story (0 = first box)
   std::map<unsigned, int> m_adjustValuesByIndex;
   std::vector<int> m_adjustValues;
   boost::optional<double> m_rotation;
@@ -69,7 +70,7 @@ struct ShapeInfo
   boost::optional<int> m_pictureContrast;
   ShapeInfo() : m_type(), m_cropType(), m_imgIndex(), m_borderImgIndex(),
     m_coordinates(), m_lines(), m_pageSeqNum(),
-    m_textId(), m_adjustValuesByIndex(), m_adjustValues(),
+    m_textId(), m_textChainIndex(), m_adjustValuesByIndex(), m_adjustValues(),
     m_rotation(), m_flips(), m_margins(), m_borderPosition(),
     m_fill(), m_customShape(), m_stretchBorderArt(false),
     m_lineBackColor(), m_dash(), m_tableInfo(),

@@ -138,7 +138,7 @@ protected:
     const std::vector<unsigned char> &vertexData,
     const std::vector<unsigned char> &segmentData,
     const std::vector<unsigned char> &guideData,
-    unsigned geoWidth, unsigned geoHeight);
+    unsigned geoWidth, unsigned geoHeight, int geoLeft = 0, int geoTop = 0);
   int getColorIndex(librevenge::RVNGInputStream *input, const MSPUBBlockInfo &info);
   unsigned getFontIndex(librevenge::RVNGInputStream *input, const MSPUBBlockInfo &info);
   CharacterStyle getCharacterStyle(librevenge::RVNGInputStream *input);

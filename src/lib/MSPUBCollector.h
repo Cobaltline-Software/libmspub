@@ -88,6 +88,7 @@ public:
                           const DynamicCustomShape &shape);
   void setShapeClipPath(unsigned seqNum, const std::vector<libmspub::Vertex> &clip);
   void setShapeVerticalTextAlign(unsigned seqNum, VerticalAlign va);
+  void setShapeTextChainIndex(unsigned seqNum, unsigned index);
   void designateMasterPage(unsigned seqNum);
   void setMasterPage(unsigned pageSeqNum, unsigned masterSeqNum);
   void setShapeStretchBorderArt(unsigned seqNum);

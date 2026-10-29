@@ -382,6 +382,11 @@ void MSPUBCollector::setShapeBeginArrow(unsigned seqNum,
   m_shapeInfosBySeqNum[seqNum].m_beginArrow = arrow;
 }
 
+void MSPUBCollector::setShapeTextChainIndex(unsigned seqNum, unsigned index)
+{
+  m_shapeInfosBySeqNum[seqNum].m_textChainIndex = index;
+}
+
 void MSPUBCollector::setShapeVerticalTextAlign(unsigned seqNum,
                                                VerticalAlign va)
 {
@@ -1102,6 +1107,12 @@ std::function<void(void)> MSPUBCollector::paintShape(const ShapeInfo &info, cons
     m_painter->setStyle(graphicsProps);
     librevenge::RVNGPropertyList props;
     setRectCoordProps(textCoord, &props);
+    // Linked text boxes share one story; consumers need the story id to flow the text box to box.
+    if (bool(info.m_textId))
+    {
+      props.insert("libmspub:text-id", (int)info.m_textId.get());
+      props.insert("libmspub:text-chain-index", (int)info.m_textChainIndex.get_value_or(0));
+    }
     double textRotation = thisTransform.getRotation();
     if (textRotation != 0)
     {
@@ -1370,13 +1381,13 @@ double MSPUBCollector::getSpecialValue(const ShapeInfo &info, const CustomShape 
   switch (arg)
   {
   case PROP_GEO_LEFT:
-    return 0;
+    return shape.m_coordLeft;
   case PROP_GEO_TOP:
-    return 0;
+    return shape.m_coordTop;
   case PROP_GEO_RIGHT:
-    return shape.m_coordWidth;
+    return shape.m_coordLeft + double(shape.m_coordWidth);
   case PROP_GEO_BOTTOM:
-    return shape.m_coordHeight;
+    return shape.m_coordTop + double(shape.m_coordHeight);
   default:
     break;
   }
@@ -1432,10 +1443,10 @@ double MSPUBCollector::getCalculationValue(const ShapeInfo &info, unsigned index
     return std::min(valOne, valTwo);
   case 5:
     return std::max(valOne, valTwo);
-  case 6:
-    return valOne ? valTwo : valThree;
-  case 7:
-    return sqrt(valOne * valTwo * valThree);
+  case 6: // MS-ODRAW msosgfIfElse: param1 > 0, not param1 != 0
+    return valOne > 0 ? valTwo : valThree;
+  case 7: // msosgfMod
+    return sqrt(valOne * valOne + valTwo * valTwo + valThree * valThree);
   case 8:
     return atan2(valTwo, valOne) / (M_PI / 180);
   case 9:
@@ -1623,6 +1634,25 @@ librevenge::RVNGPropertyList MSPUBCollector::getParaStyleProps(const ParagraphSt
   if (dropCapLetters != 0)
   {
     ret.insert("style:length", (int)dropCapLetters);
+  }
+  // List (bullet / numbering) info is parsed but was never emitted. Keys are libmspub-specific.
+  const boost::optional<ListInfo> &listInfo = bool(style.m_listInfo) ? style.m_listInfo : defaultStyle.m_listInfo;
+  if (bool(listInfo))
+  {
+    if (listInfo->m_listType == UNORDERED && bool(listInfo->m_bulletChar))
+    {
+      ret.insert("libmspub:list-type", "bullet");
+      ret.insert("libmspub:list-bullet", (int)listInfo->m_bulletChar.get());
+    }
+    else if (listInfo->m_listType == ORDERED)
+    {
+      ret.insert("libmspub:list-type", "number");
+      ret.insert("libmspub:list-numbering", (int)listInfo->m_numberingType.get_value_or(STANDARD_WESTERN));
+      if (bool(listInfo->m_numberIfRestarted))
+        ret.insert("libmspub:list-start", (int)listInfo->m_numberIfRestarted.get());
+      if (bool(listInfo->m_numberingDelimiter))
+        ret.insert("libmspub:list-delimiter", (int)listInfo->m_numberingDelimiter.get());
+    }
   }
   return ret;
 }

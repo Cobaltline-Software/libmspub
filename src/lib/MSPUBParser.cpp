@@ -975,6 +975,11 @@ bool MSPUBParser::parseShape(librevenge::RVNGInputStream *input,
         m_collector->setShapeVerticalTextAlign(chunk.seqNum,
                                                readVerticalAlign(info.data));
       }
+      else if (info.id == SHAPE_TEXT_CHAIN_INDEX)
+      {
+        // Linked text boxes: the box's place in the story's chain (absent on the first box).
+        m_collector->setShapeTextChainIndex(chunk.seqNum, info.data);
+      }
       else if (info.id == SHAPE_CROP && info.data != 0)
       {
         m_collector->setShapeCropType(chunk.seqNum, info.data);
@@ -1433,10 +1438,10 @@ ParagraphStyle MSPUBParser::getParagraphStyle(librevenge::RVNGInputStream *input
         switch (listSubInfo.id)
         {
         case PARAGRAPH_LIST_NUMBERING_TYPE:
-          numberingType = readNumberingType(info.data);
+          numberingType = readNumberingType(listSubInfo.data);
           break;
         case PARAGRAPH_LIST_BULLET_CHAR:
-          bulletChar = info.data;
+          bulletChar = listSubInfo.data;
           break;
         default:
           break;
@@ -2000,15 +2005,25 @@ void MSPUBParser::parseEscherShape(librevenge::RVNGInputStream *input, const Esc
           const std::vector<unsigned char> vertexData = foptValues.m_complexValues[FIELDID_P_VERTICES];
           if (!vertexData.empty())
           {
+            unsigned *p_geoLeft = getIfExists(foptValues.m_scalarValues,
+                                              FIELDID_GEO_LEFT);
+            unsigned *p_geoTop = getIfExists(foptValues.m_scalarValues,
+                                             FIELDID_GEO_TOP);
             unsigned *p_geoRight = getIfExists(foptValues.m_scalarValues,
                                                FIELDID_GEO_RIGHT);
             unsigned *p_geoBottom = getIfExists(foptValues.m_scalarValues,
                                                 FIELDID_GEO_BOTTOM);
+            // The geometry space can start anywhere (Publisher's guide-based shapes use -32000..32000).
+            const int geoLeft = p_geoLeft ? int(*p_geoLeft) : 0;
+            const int geoTop = p_geoTop ? int(*p_geoTop) : 0;
+            const int geoRight = p_geoRight ? int(*p_geoRight) : 21600;
+            const int geoBottom = p_geoBottom ? int(*p_geoBottom) : 21600;
             const std::vector<unsigned char> segmentData = foptValues.m_complexValues[FIELDID_P_SEGMENTS];
             const std::vector<unsigned char> guideData = foptValues.m_complexValues[FIELDID_P_GUIDES];
-            m_collector->setShapeCustomPath(*shapeSeqNum, getDynamicCustomShape(vertexData, segmentData,
-                                                                                guideData, p_geoRight ? *p_geoRight : 21600,
-                                                                                p_geoBottom ? *p_geoBottom : 21600));
+            if (geoRight > geoLeft && geoBottom > geoTop)
+              m_collector->setShapeCustomPath(*shapeSeqNum, getDynamicCustomShape(vertexData, segmentData, guideData,
+                                                                                  unsigned(geoRight - geoLeft), unsigned(geoBottom - geoTop),
+                                                                                  geoLeft, geoTop));
           }
           const std::vector<unsigned char> wrapVertexData = foptValues.m_complexValues[FIELDID_P_WRAPPOLYGONVERTICES];
           if (!wrapVertexData.empty())
@@ -2250,9 +2265,9 @@ std::shared_ptr<Fill> MSPUBParser::getNewFill(const std::map<unsigned short, uns
 DynamicCustomShape MSPUBParser::getDynamicCustomShape(
   const std::vector<unsigned char> &vertexData, const std::vector<unsigned char> &segmentData,
   const std::vector<unsigned char> &guideData, unsigned geoWidth,
-  unsigned geoHeight)
+  unsigned geoHeight, int geoLeft, int geoTop)
 {
-  DynamicCustomShape ret(geoWidth, geoHeight);
+  DynamicCustomShape ret(geoWidth, geoHeight, geoLeft, geoTop);
   ret.m_vertices = parseVertices(vertexData);
   ret.m_elements = parseSegments(segmentData);
   ret.m_calculations = parseGuides(guideData);
@@ -2283,12 +2298,36 @@ std::vector<unsigned short> MSPUBParser::parseSegments(
 }
 
 std::vector<Calculation> MSPUBParser::parseGuides(
-  const std::vector<unsigned char> &/* guideData */)
+  const std::vector<unsigned char> &guideData)
 {
   std::vector<Calculation> ret;
-
-  //FIXME : implement this function.
-
+  if (guideData.size() < 6)
+  {
+    return ret;
+  }
+  // MS-ODRAW MSOSG records, 8 bytes each: sgf (operation in bits 0-12; bits 13-15 say whether parameter 1-3 refers
+  // to an adjust value, another guide or the geometry), then three 16-bit parameters.
+  unsigned short numEntries = guideData[0] | (guideData[1] << 8);
+  unsigned short entrySize = guideData[4] | (guideData[5] << 8);
+  if (entrySize != 8)
+  {
+    MSPUB_DEBUG_MSG(("Incomprehensible entry size %u in guide complex data!\n", entrySize));
+    return ret;
+  }
+  ret.reserve(numEntries);
+  for (unsigned i = 0, offset = 6; i < numEntries && offset + 8 <= guideData.size(); ++i, offset += 8)
+  {
+    const unsigned flags = guideData[offset] | (guideData[offset + 1] << 8);
+    int args[3];
+    for (unsigned k = 0; k < 3; ++k)
+    {
+      const unsigned short v = guideData[offset + 2 + 2 * k] | (guideData[offset + 3 + 2 * k] << 8);
+      // References are indices; plain values are signed.
+      args[k] = (flags & (0x2000u << k)) ? int(v) : int(static_cast<short>(v));
+    }
+    Calculation c = { int(flags), args[0], args[1], args[2] };
+    ret.push_back(c);
+  }
   return ret;
 }
 

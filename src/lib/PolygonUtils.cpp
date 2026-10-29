@@ -5676,8 +5676,10 @@ ShapeElementCommand getCommandFromBinary(unsigned short binary)
 
 double getSpecialIfNecessary(std::function<double(unsigned index)> calculator, int val)
 {
-  bool special = val & 0x80000000;
-  return special ? calculator(val ^ 0x80000000) : val;
+  // A guide reference is 0x8000 in the high word and the guide index in the low word (MS-ODRAW); any other value
+  // with the top bit set is a negative coordinate (geometry spaces like -32000..32000).
+  bool special = (unsigned(val) >> 16) == 0x8000;
+  return special ? calculator(unsigned(val) & 0xFFFF) : val;
 }
 
 namespace
@@ -5913,6 +5915,9 @@ void writeCustomShape(unsigned shapeType, librevenge::RVNGPropertyList &graphics
   Vector2D center(x + width / 2, y + height / 2);
   double scaleX = width / shape->m_coordWidth;
   double scaleY = height / shape->m_coordHeight;
+  // Geometry spaces that don't start at 0 (geoLeft / geoTop): move the origin, keep the center.
+  x -= shape->m_coordLeft * scaleX;
+  y -= shape->m_coordTop * scaleY;
   bool allLinesSame = true;
   for (unsigned i = 0; allLinesSame && i + 1< lines.size(); ++i)
   {
@@ -6386,7 +6391,8 @@ std::shared_ptr<const CustomShape> getFromDynamicCustomShape(const DynamicCustom
                                               dcs.m_coordWidth, dcs.m_coordHeight,
                                               dcs.m_gluePoints.empty() ? nullptr : dcs.m_gluePoints.data(),
                                               dcs.m_gluePoints.size(),
-                                              dcs.m_adjustShiftMask
+                                              dcs.m_adjustShiftMask,
+                                              dcs.m_coordLeft, dcs.m_coordTop
                                             ));
 }
 
